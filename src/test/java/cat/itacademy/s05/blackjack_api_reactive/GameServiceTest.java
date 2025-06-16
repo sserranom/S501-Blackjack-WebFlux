@@ -39,7 +39,7 @@ public class GameServiceTest {
     @BeforeEach
     void setUp() {
         testGame = new Game("testPlayer");
-        testGame.setId("game123");
+        testGame.setId("gameTest");
         testGame.setPlayerHand("AS, 10");
         testGame.setPlayerHandValue(21);
         testGame.setDealerHand("7");
@@ -132,7 +132,7 @@ public class GameServiceTest {
                 .expectNextMatches(gameDetails -> gameDetails.getPlayerHand().contains("7, 8, "))
                 .verifyComplete();
 
-        verify(gameRepository, times(1)).findById("game123");
+        verify(gameRepository, times(1)).findById("gameTest");
         verify(gameRepository, times(1)).save(any(Game.class));
         verify(playerRepository, times(1)).findByName(any(String.class));
         verify(playerRepository, times(1)).save(any(Player.class));
@@ -164,7 +164,7 @@ public class GameServiceTest {
         verify(playerRepository, times(1)).findByName(any(String.class));
         verify(playerRepository, times(1)).save(any(Player.class));
     }
-    
+
     @Test
     @DisplayName("\n" +
             "I should delete an existing game")
