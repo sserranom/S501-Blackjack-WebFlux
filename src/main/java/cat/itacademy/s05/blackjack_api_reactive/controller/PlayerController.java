@@ -1,5 +1,6 @@
 package cat.itacademy.s05.blackjack_api_reactive.controller;
 
+import cat.itacademy.s05.blackjack_api_reactive.dto.NewPlayerRequest;
 import cat.itacademy.s05.blackjack_api_reactive.dto.PlayerNameUpdateRequest;
 import cat.itacademy.s05.blackjack_api_reactive.model.Player;
 import cat.itacademy.s05.blackjack_api_reactive.services.PlayerService;
@@ -11,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -24,6 +27,20 @@ public class PlayerController {
 
     public PlayerController(PlayerService playerService) {
         this.playerService = playerService;
+    }
+
+    @PostMapping("/new")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a new player",
+                description = "Record a new player in the application. The player's name must be unique")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "JPlayer created successfully",
+            content = @Content(schema = @Schema(implementation = Player.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request (Empty Name)."),
+            @ApiResponse(responseCode = "409", description = "There is already a player with this name")
+    })
+    public Mono<Player> createNewPlayer(@Valid @RequestBody NewPlayerRequest request){
+        return playerService.createNewPlayer(request.getPlayerName());
     }
 
     @GetMapping("/ranking")

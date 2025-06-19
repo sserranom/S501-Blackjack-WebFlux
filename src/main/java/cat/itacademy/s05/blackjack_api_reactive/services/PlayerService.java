@@ -17,6 +17,17 @@ public class PlayerService {
         this.playerRepository = playerRepository;
     }
 
+    public Mono<Player> createNewPlayer(String playerName){
+        return playerRepository.findByName(playerName)
+                .flatMap(existingPlayer -> Mono.error(new ResponseStatusException(
+                        HttpStatus.CONFLICT, "There is already a player with the name: "+ playerName)))
+                .switchIfEmpty(Mono.defer(() -> {
+                    Player newPlayer = new Player(playerName);
+                    return playerRepository.save(newPlayer);
+                }))
+                .cast(Player.class);
+    }
+
     public Flux<Player> getPlayerRanking() {
         return playerRepository.findAllByOrderByTotalScoreDesc();
     }
@@ -29,4 +40,6 @@ public class PlayerService {
                     return playerRepository.save(player);
                 });
     }
+
+
 }
