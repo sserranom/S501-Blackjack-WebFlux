@@ -1,56 +1,72 @@
 package cat.itacademy.s05.blackjack_api_reactive;
 
 import cat.itacademy.s05.blackjack_api_reactive.controller.GameController;
+import cat.itacademy.s05.blackjack_api_reactive.domain.enums.GameStatus;
+import cat.itacademy.s05.blackjack_api_reactive.domain.enums.PlayType;
 import cat.itacademy.s05.blackjack_api_reactive.dto.GameDetailsResponse;
 import cat.itacademy.s05.blackjack_api_reactive.dto.NewGameRequest;
 import cat.itacademy.s05.blackjack_api_reactive.dto.PlayRequest;
+import cat.itacademy.s05.blackjack_api_reactive.exception.GameNotFoundException;
+import cat.itacademy.s05.blackjack_api_reactive.exception.GlobalExceptionHandler;
+import cat.itacademy.s05.blackjack_api_reactive.exception.InvalidGameStateException;
 import cat.itacademy.s05.blackjack_api_reactive.model.Game;
 import cat.itacademy.s05.blackjack_api_reactive.services.GameService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
+import java.time.LocalDateTime;
+import java.util.Collections;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
-@WebFluxTest(GameController.class)
+@WebFluxTest(controllers = GameController.class)
+@Import(GlobalExceptionHandler.class)
 public class GameControllerTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
-    @Autowired
+    @MockBean
     private GameService gameService;
 
-    @TestConfiguration
-    static class GameControllerTestConfig {
-        @Bean
-        public GameService gameService() {
+    private Game testGame;
+    private GameDetailsResponse testGameDetailsResponse;
 
-            return Mockito.mock(GameService.class);
-        }
+    @BeforeEach
+    void setUp() {
+        testGame = new Game("TestPlayer");
+        testGame.setId("game123");
+        testGame.setPlayerHand(Collections.emptyList());
+        testGame.setDealerHand(Collections.emptyList());
+        testGame.setPlayerHandValue(0);
+        testGame.setDealerHandValue(0);
+        testGame.setStatus(GameStatus.IN_PROGRESS);
+        testGame.setPlayerScore(0.0);
+        testGame.setCreatedAt(LocalDateTime.now());
+        testGame.setUpdatedAt(LocalDateTime.now());
+
+        testGameDetailsResponse = new GameDetailsResponse(testGame);
     }
 
     @Test
-    @DisplayName("POST /game/new should create a new game")
-    void createNewGame_shouldReturnCreatedGame() {
-        Game mockGame = new Game("TestPlayer");
-        mockGame.setId("abc-123");
-        mockGame.setStatus("IN_PROGRESS");
+    @DisplayName("should create a new game and return 201 Created")
+    void createNewGame_ValidRequest_Returns201() {
 
-        when(gameService.createNewGame(any(String.class))).thenReturn(Mono.just(mockGame));
+        NewGameRequest request = new NewGameRequest("NewPlayer");
+        Game createdGame = new Game("NewPlayer");
+        createdGame.setId("newGameId");
+        createdGame.setStatus(GameStatus.IN_PROGRESS);
 
-        NewGameRequest request = new NewGameRequest("TestPlayer");
+        when(gameService.createNewGame(anyString())).thenReturn(Mono.just(createdGame));
 
         webTestClient.post().uri("/game/new")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -58,89 +74,144 @@ public class GameControllerTest {
                 .exchange()
                 .expectStatus().isCreated()
                 .expectBody(Game.class)
-                .isEqualTo(mockGame);
+                .consumeWith(response -> {
+                    Game responseBody = response.getResponseBody();
+                    assert responseBody != null;
+                    assert responseBody.getId().equals("newGameId");
+                    assert responseBody.getPlayerName().equals("NewPlayer");
+                });
 
-        verify(gameService, times(1)).createNewGame("TestPlayer");
+        verify(gameService, times(1)).createNewGame("NewPlayer");
     }
 
     @Test
-    @DisplayName("\n" +
-            "POST /game/new should return 400 if the player name is empty")
-    void createNewGame_shouldReturnBadRequestWhenPlayerNameIsEmpty() {
+    @DisplayName("should return 400 Bad Request if player name is blank when creating new game")
+    void createNewGame_BlankPlayerName_Returns400() {
+
         NewGameRequest request = new NewGameRequest("");
 
         webTestClient.post().uri("/game/new")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
-                .expectStatus().isBadRequest();
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(400)
+                .jsonPath("$.error").isEqualTo("Bad Request")
+                .jsonPath("$.message").isEqualTo("Validation Failed");
+
+        verify(gameService, never()).createNewGame(anyString());
     }
 
     @Test
-    @DisplayName("\n" +
-            "GET /game/{id} should get the details of a game")
-    void getGameDetails_shouldReturnGameDetails() {
-        GameDetailsResponse mockResponse = new GameDetailsResponse();
-        mockResponse.setId("game456");
-        mockResponse.setPlayerName("ExistingPlayer");
-        mockResponse.setStatus("IN_PROGRESS");
+    @DisplayName("should retrieve game details and return 200 OK")
+    void getGameDetails_GameFound_Returns200() {
 
+        when(gameService.getGameDetails(testGame.getId())).thenReturn(Mono.just(testGameDetailsResponse));
 
-        when(gameService.getGameDetails("game456")).thenReturn(Mono.just(mockResponse));
-
-        webTestClient.get().uri("/game/{id}", "game456")
+        webTestClient.get().uri("/game/{id}", testGame.getId())
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(GameDetailsResponse.class)
-                .isEqualTo(mockResponse);
-
-        verify(gameService, times(1)).getGameDetails("game456");
+                .consumeWith(response -> {
+                    GameDetailsResponse responseBody = response.getResponseBody();
+                    assert responseBody != null;
+                    assert responseBody.getId().equals(testGame.getId());
+                    assert responseBody.getPlayerName().equals(testGame.getPlayerName());
+                });
+        verify(gameService, times(1)).getGameDetails(testGame.getId());
     }
 
     @Test
-    @DisplayName("GET /game/{id} should return 404 if the game is not found")
-    void getGameDetails_shouldReturnNotFoundWhenGameNotFound() {
-        when(gameService.getGameDetails("nonExistentId")).thenReturn(Mono.empty());
+    @DisplayName("should return 404 Not Found if game does not exist for details")
+    void getGameDetails_GameNotFound_Returns404() {
 
-        webTestClient.get().uri("/game/{id}", "nonExistentId")
+        when(gameService.getGameDetails(anyString())).thenReturn(Mono.error(new GameNotFoundException("Game not found")));
+
+        webTestClient.get().uri("/game/nonExistentId")
                 .exchange()
-                .expectStatus().isNotFound();
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.error").isEqualTo("Not Found")
+                .jsonPath("$.message").isEqualTo("Game not found");
+
+        verify(gameService, times(1)).getGameDetails("nonExistentId");
     }
 
     @Test
-    @DisplayName("\n" +
-            "POST /game/{id}/play should perform a play and return the updated state")
-    void play_shouldReturnUpdatedGameDetails() {
-        GameDetailsResponse mockResponse = new GameDetailsResponse();
-        mockResponse.setId("game789");
-        mockResponse.setPlayerName("PlayingPlayer");
-        mockResponse.setStatus("PLAYER_WINS");
+    @DisplayName("should process a player's play and return 200 OK")
+    void play_ValidPlay_Returns200() {
 
-        PlayRequest request = new PlayRequest("STAND", 10.0);
+        PlayRequest request = new PlayRequest(PlayType.HIT, 10.0);
+        GameDetailsResponse responseAfterPlay = new GameDetailsResponse(testGame);
+        responseAfterPlay.setStatus(GameStatus.IN_PROGRESS);
 
-        when(gameService.play(any(String.class), any(PlayRequest.class))).thenReturn(Mono.just(mockResponse));
+        when(gameService.play(testGame.getId(), request)).thenReturn(Mono.just(responseAfterPlay));
 
-        webTestClient.post().uri("/game/{id}/play", "game789")
+        webTestClient.post().uri("/game/{id}/play", testGame.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
-                .expectStatus().isOk() // Espera un código de estado 200 OK
+                .expectStatus().isOk()
                 .expectBody(GameDetailsResponse.class)
-                .isEqualTo(mockResponse);
+                .consumeWith(response -> {
+                    GameDetailsResponse responseBody = response.getResponseBody();
+                    assert responseBody != null;
+                    assert responseBody.getId().equals(testGame.getId());
+                    assert responseBody.getStatus() == GameStatus.IN_PROGRESS;
+                });
 
-        verify(gameService, times(1)).play("game789", request);
+        verify(gameService, times(1)).play(testGame.getId(), request);
     }
 
     @Test
-    @DisplayName("\n" +
-            "DELETE /game/{id}/delete should delete a game")
-    void deleteGame_shouldReturnNoContent() {
-        when(gameService.deleteGame(any(String.class))).thenReturn(Mono.empty());
+    @DisplayName("should return 400 Bad Request if play is invalid (e.g., game already over)")
+    void play_InvalidGameState_Returns400() {
 
-        webTestClient.delete().uri("/game/{id}/delete", "game999")
+        PlayRequest request = new PlayRequest(PlayType.STAND, 10.0);
+        when(gameService.play(testGame.getId(), request)).thenReturn(Mono.error(new InvalidGameStateException("Game already over")));
+
+        webTestClient.post().uri("/game/{id}/play", testGame.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
                 .exchange()
-                .expectStatus().isNoContent();
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(400)
+                .jsonPath("$.message").isEqualTo("Game already over");
 
-        verify(gameService, times(1)).deleteGame("game999");
+        verify(gameService, times(1)).play(testGame.getId(), request);
+    }
+
+    @Test
+    @DisplayName("should return 204 No Content when deleting a game successfully")
+    void deleteGame_GameFound_Returns204() {
+        // Given
+        when(gameService.deleteGame(testGame.getId())).thenReturn(Mono.empty());
+
+        // When & Then
+        webTestClient.delete().uri("/game/{id}/delete", testGame.getId())
+                .exchange()
+                .expectStatus().isNoContent()
+                .expectBody().isEmpty();
+
+        verify(gameService, times(1)).deleteGame(testGame.getId());
+    }
+
+    @Test
+    @DisplayName("should return 404 Not Found when deleting a non-existent game")
+    void deleteGame_GameNotFound_Returns404() {
+
+        when(gameService.deleteGame(anyString())).thenReturn(Mono.error(new GameNotFoundException("Game to delete not found")));
+
+        webTestClient.delete().uri("/game/nonExistentId/delete")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.message").isEqualTo("Game to delete not found");
+
+        verify(gameService, times(1)).deleteGame("nonExistentId");
     }
 }

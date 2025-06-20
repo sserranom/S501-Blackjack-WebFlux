@@ -5,63 +5,105 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ResponseStatusException.class)
-    public Mono<ResponseEntity<Map<String, Object>>> handleResponseStatusException(ResponseStatusException ex, ServerWebExchange exchange) {
-        Map<String, Object> errorDetails = new HashMap<>();
-        errorDetails.put("timestamp", LocalDateTime.now());
+    @ExceptionHandler(GameNotFoundException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleGameNotFoundException(GameNotFoundException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return Mono.just(new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND));
+    }
 
-        HttpStatus httpStatus = HttpStatus.valueOf(ex.getStatusCode().value());
-        errorDetails.put("status", httpStatus.value());
-        errorDetails.put("error", httpStatus.getReasonPhrase());
-        errorDetails.put("message", ex.getReason());
-
-        errorDetails.put("path", Optional.ofNullable(exchange.getRequest().getPath().value()).orElse("N/A"));
-
-        return Mono.just(new ResponseEntity<>(errorDetails, httpStatus));
+    @ExceptionHandler(InvalidGameStateException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleInvalidGameStateException(InvalidGameStateException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return Mono.just(new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST));
     }
 
     @ExceptionHandler(WebExchangeBindException.class)
-    public Mono<ResponseEntity<Map<String, Object>>> handleValidationExceptions(WebExchangeBindException ex, ServerWebExchange exchange) {
-        Map<String, Object> fieldErrors = new HashMap<>();
+    public Mono<ResponseEntity<ErrorResponse>> handleValidationExceptions(WebExchangeBindException ex) {
+        Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error ->
-                fieldErrors.put(error.getField(), error.getDefaultMessage()));
+                errors.put(error.getField(), error.getDefaultMessage()));
 
-        Map<String, Object> errorDetails = new HashMap<>();
-        errorDetails.put("timestamp", LocalDateTime.now());
-        errorDetails.put("status", HttpStatus.BAD_REQUEST.value());
-        errorDetails.put("error", "Validation Error");
-        errorDetails.put("message", "\n" +
-                "One or more fields in your application are invalid.");
-        errorDetails.put("details", fieldErrors);
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Validation Failed",
+                LocalDateTime.now(),
+                errors
+        );
+        return Mono.just(new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST));
+    }
 
-        errorDetails.put("path", Optional.ofNullable(exchange.getRequest().getPath().value()).orElse("N/A"));
-
-        return Mono.just(new ResponseEntity<>(errorDetails, HttpStatus.BAD_REQUEST));
+    @ExceptionHandler(IllegalArgumentException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return Mono.just(new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST));
     }
 
     @ExceptionHandler(Exception.class)
-    public Mono<ResponseEntity<Map<String, Object>>> handleGenericException(Exception ex, ServerWebExchange exchange) {
-        Map<String, Object> errorDetails = new HashMap<>();
-        errorDetails.put("timestamp", LocalDateTime.now());
-        errorDetails.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        errorDetails.put("error", "Internal Server Error");
-        errorDetails.put("message", "\n" +
-                "An unexpected error has occurred: " + ex.getMessage());
+    public Mono<ResponseEntity<ErrorResponse>> handleGenericException(Exception ex) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                "An unexpected error occurred: " + ex.getMessage(),
+                LocalDateTime.now()
+        );
+        ex.printStackTrace();
+        return Mono.just(new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR));
+    }
 
-        errorDetails.put("path", Optional.ofNullable(exchange.getRequest().getPath().value()).orElse("N/A"));
+    public static class ErrorResponse {
+        private int status;
+        private String error;
+        private String message;
+        private LocalDateTime timestamp;
+        private Map<String, String> details;
 
-        return Mono.just(new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR));
+        public ErrorResponse(int status, String error, String message, LocalDateTime timestamp) {
+            this.status = status;
+            this.error = error;
+            this.message = message;
+            this.timestamp = timestamp;
+        }
+
+        public ErrorResponse(int status, String error, String message, LocalDateTime timestamp, Map<String, String> details) {
+            this(status, error, message, timestamp);
+            this.details = details;
+        }
+
+        public int getStatus() { return status; }
+        public String getError() { return error; }
+        public String getMessage() { return message; }
+        public LocalDateTime getTimestamp() { return timestamp; }
+        public Map<String, String> getDetails() { return details; }
+
+        public void setStatus(int status) { this.status = status; }
+        public void setError(String error) { this.error = error; }
+        public void setMessage(String message) { this.message = message; }
+        public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+        public void setDetails(Map<String, String> details) { this.details = details; }
     }
 }

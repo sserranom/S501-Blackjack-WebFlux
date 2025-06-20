@@ -4,6 +4,8 @@ import cat.itacademy.s05.blackjack_api_reactive.domain.BlackjackGameEngine;
 import cat.itacademy.s05.blackjack_api_reactive.domain.enums.GameStatus;
 import cat.itacademy.s05.blackjack_api_reactive.dto.GameDetailsResponse;
 import cat.itacademy.s05.blackjack_api_reactive.dto.PlayRequest;
+import cat.itacademy.s05.blackjack_api_reactive.exception.GameNotFoundException;
+import cat.itacademy.s05.blackjack_api_reactive.exception.InvalidGameStateException;
 import cat.itacademy.s05.blackjack_api_reactive.model.Game;
 import cat.itacademy.s05.blackjack_api_reactive.model.Player;
 import cat.itacademy.s05.blackjack_api_reactive.repository.GameRepository;
@@ -39,7 +41,7 @@ public class GameService {
 
                     return gameRepository.save(newGame)
                             .flatMap(savedGame -> {
-                                if (savedGame.getStatus() != GameStatus.IN_PROGRESS){
+                                if (savedGame.getStatus() != GameStatus.IN_PROGRESS) {
                                     boolean isWin = (savedGame.getStatus() == GameStatus.PLAYER_WINS || savedGame.getStatus() == GameStatus.PLAYER_BLACKJACK);
                                     return updatePlayerScore(player, savedGame.getPlayerScore(), isWin).thenReturn(savedGame);
                                 }
@@ -50,25 +52,19 @@ public class GameService {
 
     public Mono<GameDetailsResponse> getGameDetails(String gameId) {
         return gameRepository.findById(gameId)
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "\n" +
-                        "Game not found with ID: " + gameId)))
+                .switchIfEmpty(Mono.error(new GameNotFoundException("Game not found with ID: " + gameId)))
                 .map(GameDetailsResponse::new);
     }
 
     public Mono<GameDetailsResponse> play(String gameId, PlayRequest playRequest) {
         return gameRepository.findById(gameId)
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found with ID: " + gameId)))
+                .switchIfEmpty(Mono.error(new GameNotFoundException("Game not found with ID: " + gameId)))
                 .flatMap(game -> {
                     if (game.getStatus() != GameStatus.IN_PROGRESS) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "The game is already over or not in progress. Current status: " + game.getStatus()));
+                        throw new InvalidGameStateException("The game is already over or not in progress. Current status: " + game.getStatus());
                     }
 
-                    try {
-                        gameEngine.processPlayerMove(game, playRequest.getPlayType(), playRequest.getBetAmount());
-                    } catch (IllegalArgumentException e) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()));
-                    }
-
+                    gameEngine.processPlayerMove(game, playRequest.getPlayType(), playRequest.getBetAmount());
                     game.setUpdatedAt(LocalDateTime.now());
 
                     return gameRepository.save(game)
@@ -85,7 +81,7 @@ public class GameService {
 
     public Mono<Void> deleteGame(String gameId) {
         return gameRepository.findById(gameId)
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Game not found with ID: " + gameId)))
+                .switchIfEmpty(Mono.error(new GameNotFoundException("Game not found with ID: " + gameId)))
                 .flatMap(gameRepository::delete);
     }
 
