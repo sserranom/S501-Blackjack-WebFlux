@@ -26,7 +26,10 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 
 @WebFluxTest(controllers = GameController.class)
 @Import(GlobalExceptionHandler.class)
@@ -60,7 +63,7 @@ public class GameControllerTest {
     @Test
     @DisplayName("should create a new game and return 201 Created")
     void createNewGame_ValidRequest_Returns201() {
-
+        // Given
         NewGameRequest request = new NewGameRequest("NewPlayer");
         Game createdGame = new Game("NewPlayer");
         createdGame.setId("newGameId");
@@ -68,6 +71,7 @@ public class GameControllerTest {
 
         when(gameService.createNewGame(anyString())).thenReturn(Mono.just(createdGame));
 
+        // When & Then
         webTestClient.post().uri("/game/new")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -87,7 +91,6 @@ public class GameControllerTest {
     @Test
     @DisplayName("should return 400 Bad Request if player name is blank when creating new game")
     void createNewGame_BlankPlayerName_Returns400() {
-
         NewGameRequest request = new NewGameRequest("");
 
         webTestClient.post().uri("/game/new")
@@ -106,9 +109,10 @@ public class GameControllerTest {
     @Test
     @DisplayName("should retrieve game details and return 200 OK")
     void getGameDetails_GameFound_Returns200() {
-
+        // Given
         when(gameService.getGameDetails(testGame.getId())).thenReturn(Mono.just(testGameDetailsResponse));
 
+        // When & Then
         webTestClient.get().uri("/game/{id}", testGame.getId())
                 .exchange()
                 .expectStatus().isOk()
@@ -119,18 +123,20 @@ public class GameControllerTest {
                     assert responseBody.getId().equals(testGame.getId());
                     assert responseBody.getPlayerName().equals(testGame.getPlayerName());
                 });
+
         verify(gameService, times(1)).getGameDetails(testGame.getId());
     }
 
     @Test
     @DisplayName("should return 404 Not Found if game does not exist for details")
     void getGameDetails_GameNotFound_Returns404() {
-
+        // Given
         when(gameService.getGameDetails(anyString())).thenReturn(Mono.error(new GameNotFoundException("Game not found")));
 
+        // When & Then
         webTestClient.get().uri("/game/nonExistentId")
                 .exchange()
-                .expectStatus().isNotFound()
+                .expectStatus().isNotFound() // Verifica el código de estado HTTP 404
                 .expectBody()
                 .jsonPath("$.status").isEqualTo(404)
                 .jsonPath("$.error").isEqualTo("Not Found")
@@ -142,13 +148,14 @@ public class GameControllerTest {
     @Test
     @DisplayName("should process a player's play and return 200 OK")
     void play_ValidPlay_Returns200() {
-
+        // Given
         PlayRequest request = new PlayRequest(PlayType.HIT, 10.0);
         GameDetailsResponse responseAfterPlay = new GameDetailsResponse(testGame);
         responseAfterPlay.setStatus(GameStatus.IN_PROGRESS);
 
         when(gameService.play(testGame.getId(), request)).thenReturn(Mono.just(responseAfterPlay));
 
+        // When & Then
         webTestClient.post().uri("/game/{id}/play", testGame.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -168,9 +175,29 @@ public class GameControllerTest {
     @Test
     @DisplayName("should return 400 Bad Request if play is invalid (e.g., game already over)")
     void play_InvalidGameState_Returns400() {
-
+        // Given
         PlayRequest request = new PlayRequest(PlayType.STAND, 10.0);
-        when(gameService.play(testGame.getId(), request)).thenReturn(Mono.error(new InvalidGameStateException("Game already over")));
+        when(gameService.play(testGame.getId(), request)).thenReturn(Mono.error(new InvalidGameStateException("The game is already over or not in progress. Current status: DEALER_WINS")));
+
+        // When & Then
+        webTestClient.post().uri("/game/{id}/play", testGame.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(400)
+                .jsonPath("$.message").isEqualTo("The game is already over or not in progress. Current status: DEALER_WINS");
+
+        verify(gameService, times(1)).play(testGame.getId(), request);
+    }
+
+    @Test
+    @DisplayName("should return 400 Bad Request if game service indicates invalid play rule")
+    void play_InvalidPlayRule_Returns400() {
+
+        PlayRequest request = new PlayRequest(PlayType.DOUBLE_DOWN, 10.0);
+        when(gameService.play(testGame.getId(), request)).thenReturn(Mono.error(new IllegalArgumentException("Double Down is only allowed on the first turn (player has 2 cards).")));
 
         webTestClient.post().uri("/game/{id}/play", testGame.getId())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -179,7 +206,8 @@ public class GameControllerTest {
                 .expectStatus().isBadRequest()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo(400)
-                .jsonPath("$.message").isEqualTo("Game already over");
+                .jsonPath("$.error").isEqualTo("Bad Request")
+                .jsonPath("$.message").isEqualTo("Double Down is only allowed on the first turn (player has 2 cards).");
 
         verify(gameService, times(1)).play(testGame.getId(), request);
     }
@@ -187,10 +215,7 @@ public class GameControllerTest {
     @Test
     @DisplayName("should return 204 No Content when deleting a game successfully")
     void deleteGame_GameFound_Returns204() {
-        // Given
         when(gameService.deleteGame(testGame.getId())).thenReturn(Mono.empty());
-
-        // When & Then
         webTestClient.delete().uri("/game/{id}/delete", testGame.getId())
                 .exchange()
                 .expectStatus().isNoContent()
@@ -202,9 +227,10 @@ public class GameControllerTest {
     @Test
     @DisplayName("should return 404 Not Found when deleting a non-existent game")
     void deleteGame_GameNotFound_Returns404() {
-
+        // Given
         when(gameService.deleteGame(anyString())).thenReturn(Mono.error(new GameNotFoundException("Game to delete not found")));
 
+        // When & Then
         webTestClient.delete().uri("/game/nonExistentId/delete")
                 .exchange()
                 .expectStatus().isNotFound()
@@ -214,4 +240,5 @@ public class GameControllerTest {
 
         verify(gameService, times(1)).deleteGame("nonExistentId");
     }
+
 }

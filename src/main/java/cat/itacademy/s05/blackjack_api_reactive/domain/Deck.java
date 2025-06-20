@@ -2,9 +2,11 @@ package cat.itacademy.s05.blackjack_api_reactive.domain;
 
 import cat.itacademy.s05.blackjack_api_reactive.domain.enums.Rank;
 import cat.itacademy.s05.blackjack_api_reactive.domain.enums.Suit;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+@Component
 public class Deck {
     private List<Card> cards;
     private final Random random;
