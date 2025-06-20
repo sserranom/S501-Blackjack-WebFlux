@@ -44,7 +44,7 @@ public class Game {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void addCartToPlayerHand(Card card) {
+    public void addCardToPlayerHand(Card card) {
         if (this.playerHand == null) {
             this.playerHand = new ArrayList<>();
         }

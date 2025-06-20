@@ -1,11 +1,15 @@
 package cat.itacademy.s05.blackjack_api_reactive.dto;
 
+import cat.itacademy.s05.blackjack_api_reactive.domain.Card;
+import cat.itacademy.s05.blackjack_api_reactive.domain.enums.GameStatus;
 import cat.itacademy.s05.blackjack_api_reactive.model.Game;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.cache.Cache;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -14,11 +18,11 @@ public class GameDetailsResponse {
 
     private String id;
     private String playerName;
-    private String playerHand;
+    private List<Card> playerHand;
     private int playerHandValue;
-    private String dealerHand;
+    private List<Card> dealerHand;
     private int dealerHandValue;
-    private String status;
+    private GameStatus status;
     private double playerScore;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -30,6 +30,10 @@ public enum Rank {
         return symbol;
     }
 
+    public int getValue(){
+        return value;
+    }
+
     public static Rank fromSymbol(String symbol){
         for (Rank rank : Rank.values()){
             if (rank.symbol.equalsIgnoreCase(symbol)){
