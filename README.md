@@ -56,7 +56,7 @@ This project implements a **Blackjack game API** using **Spring Boot WebFlux** (
    ```bash
    mvn clean package -DskipTests
 
-   ## ▶️ API Usage
+4. **▶️ API Usage
 
 Once the application is running (`docker-compose up`):
 
