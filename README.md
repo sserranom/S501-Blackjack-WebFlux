@@ -16,7 +16,7 @@ This project implements a **Blackjack game API** using **Spring Boot WebFlux** (
 - - **Public Docker Image:** The application is also available on Docker Hub:
 
      ```bash
-  docker pull sserranom/blackjack-api-reactive
+     docker pull sserranom/blackjack-api-reactive
 
 ---
 
