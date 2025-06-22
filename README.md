@@ -13,7 +13,7 @@ This project implements a **Blackjack game API** using **Spring Boot WebFlux** (
 - **Centralized Exception Handling:** Implements custom exceptions and a `GlobalExceptionHandler` to provide clear and consistent error responses.
 - **Robust Unit Testing:** Includes unit tests for core services and controllers using JUnit 5 and Mockito.
 - **Dockerized:** Easily packaged and deployed with Docker alongside MongoDB and MySQL using Dockerfile and Docker Compose.
-- - **Public Docker Image:** The application is also available on Docker Hub:
+- **Public Docker Image:** The application is also available on Docker Hub:
 
      ```bash
      docker pull sserranom/blackjack-api-reactive
