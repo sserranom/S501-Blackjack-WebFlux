@@ -8,7 +8,7 @@ spring:
   r2dbc:
     url: r2dbc:mysql://localhost:3306/blackjack_reactive_mysql
     username: root
-    password: It.serrano
+    password: 1234
 
   r2dbc.pool:
     enabled: true

@@ -11,7 +11,7 @@ services:
       SPRING_DATA_MONGODB_DATABASE: blackjack_reactive_mongo
       SPRING_R2DBC_URL: r2dbc:mysql://mysql:3306/blackjack_reactive_mysql
       SPRING_R2DBC_USERNAME: root
-      SPRING_R2DBC_PASSWORD: It.serrano
+      SPRING_R2DBC_PASSWORD: 1234
       SPRING_SQL_INIT_MODE: never
     depends_on:
       - mongo
@@ -33,7 +33,7 @@ services:
     ports:
       - "3307:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: It.serrano
+      MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: blackjack_reactive_mysql
     volumes:
       - mysql-data:/var/lib/mysql
