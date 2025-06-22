@@ -22,7 +22,7 @@ spring:
       mode: always
       platform: mysql
       continue-on-error: true
-      schema-locations: classpath:schema.sql
+      schema-locations: classpath:init.sql
 
 server:
   port: 8080

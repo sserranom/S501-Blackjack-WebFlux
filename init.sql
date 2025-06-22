@@ -1,4 +1,3 @@
-
 CREATE DATABASE IF NOT EXISTS blackjack_reactive_mysql;
 
 USE blackjack_reactive_mysql;
